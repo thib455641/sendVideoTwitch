@@ -1,0 +1,10 @@
+# Environnement virtuel
+venv/
+__pycache__/
+
+# Variables sensibles
+.env
+
+# Fichiers médias uploadés par les viewers (pour ne pas polluer ton GitHub)
+static/uploads/*
+!static/uploads/.gitkeep

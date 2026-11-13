@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Overlay OBS - Fenêtre Rétro 400x400</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.1/socket.io.min.js"></script>
+    <style>
+        @font-face {
+            font-family: 'LoveLetterTW';
+            src: url('{{ url_for("static", filename="fonts/love_letter_tw.ttf") }}') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body {
+            background-color: transparent;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #alert-box {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            opacity: 0;
+            transform: scale(0.8);
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        #alert-box.show {
+            display: flex;
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        /* --- FENÊTRE RÉTRO HTML (Style Windows 95/98) --- */
+        .retro-window {
+            background: #c0c0c0;
+            border-top: 2px solid #ffffff;
+            border-left: 2px solid #ffffff;
+            border-right: 2px solid #404040;
+            border-bottom: 2px solid #404040;
+            padding: 3px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.8);
+            display: inline-flex;
+            flex-direction: column;
+        }
+
+        /* Barre de titre bleue */
+        .title-bar {
+            background: linear-gradient(90deg, #000080, #1084d0);
+            padding: 4px 6px;
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            margin-bottom: 3px;
+        }
+
+        /* Boutons de la barre de titre (_ □ X) */
+        .title-bar-buttons {
+            display: flex;
+            gap: 2px;
+        }
+
+        .title-bar-button {
+            width: 14px;
+            height: 12px;
+            background: #c0c0c0;
+            border-top: 1px solid #ffffff;
+            border-left: 1px solid #ffffff;
+            border-right: 1px solid #404040;
+            border-bottom: 1px solid #404040;
+            font-size: 9px;
+            line-height: 9px;
+            text-align: center;
+            font-weight: bold;
+            color: #000;
+            cursor: default;
+        }
+
+        /* Corps de la fenêtre */
+        .window-body {
+            display: flex;
+            background: #c0c0c0;
+        }
+
+        /* Zone blanche centrale fixée à 400x400 px */
+        .media-container {
+            width: 400px;
+            height: 400px;
+            background: #ffffff;
+            border-top: 2px solid #404040;
+            border-left: 2px solid #404040;
+            border-right: 2px solid #ffffff;
+            border-bottom: 2px solid #ffffff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        .media-container img,
+        .media-container video {
+            width: 100%;
+            height: 100%;
+            object-fit: contain; /* S'adapte, s'agrandit ou s'emboîte parfaitement dans le carré de 400x400 */
+            display: block;
+        }
+
+        /* Ascenseur latéral droit */
+        .scrollbar-vertical {
+            width: 16px;
+            background: #c0c0c0;
+            border-top: 2px solid #404040;
+            border-left: 2px solid #404040;
+            border-right: 2px solid #ffffff;
+            border-bottom: 2px solid #ffffff;
+            margin-left: 2px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1px;
+        }
+
+        .scroll-btn {
+            width: 12px;
+            height: 12px;
+            background: #c0c0c0;
+            border-top: 1px solid #ffffff;
+            border-left: 1px solid #ffffff;
+            border-right: 1px solid #404040;
+            border-bottom: 1px solid #404040;
+            font-size: 8px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .scroll-track-v {
+            flex: 1;
+            width: 12px;
+            background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='2' height='2'><rect width='1' height='1' fill='%23808080'/><rect x='1' y='1' width='1' height='1' fill='%23ffffff'/></svg>");
+            margin: 1px 0;
+        }
+
+        /* Ascenseur du bas */
+        .scrollbar-horizontal-row {
+            display: flex;
+            margin-top: 2px;
+            height: 16px;
+        }
+
+        .scrollbar-horizontal {
+            flex: 1;
+            background: #c0c0c0;
+            border-top: 2px solid #404040;
+            border-left: 2px solid #404040;
+            border-right: 2px solid #ffffff;
+            border-bottom: 2px solid #ffffff;
+            display: flex;
+            align-items: center;
+            padding: 1px;
+        }
+
+        .scroll-track-h {
+            flex: 1;
+            height: 12px;
+            background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='2' height='2'><rect width='1' height='1' fill='%23808080'/><rect x='1' y='1' width='1' height='1' fill='%23ffffff'/></svg>");
+            margin: 0 1px;
+        }
+
+        .corner-square {
+            width: 16px;
+            height: 16px;
+            background: #c0c0c0;
+            border-top: 2px solid #404040;
+            border-left: 2px solid #404040;
+            border-right: 2px solid #ffffff;
+            border-bottom: 2px solid #ffffff;
+            margin-left: 2px;
+        }
+
+        /* --- ZONE DE TEXTE EN DESSOUS --- */
+        .text-container {
+            margin-top: 15px;
+            text-align: center;
+            width: 100%;
+            padding: 0 10px;
+        }
+
+        .message {
+            font-family: 'LoveLetterTW', 'Courier New', monospace;
+            font-size: 30px;
+            color: #ffffff;
+            word-break: break-word;
+            text-shadow: 3px 3px 0px #000, -3px -3px 0px #000, 3px -3px 0px #000, -3px 3px 0px #000, 0px 5px 10px rgba(0,0,0,0.9);
+            line-height: 1.3;
+            max-width: 450px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="alert-box">
+        <!-- Fenêtre Rétro HTML carrée 400x400 -->
+        <div class="retro-window">
+            <div class="title-bar">
+                <div class="title-bar-buttons">
+                    <div class="title-bar-button">_</div>
+                    <div class="title-bar-button">□</div>
+                    <div class="title-bar-button">✕</div>
+                </div>
+            </div>
+            <div class="window-body">
+                <div class="media-container" id="mediaContainer"></div>
+                <div class="scrollbar-vertical">
+                    <div class="scroll-btn">▲</div>
+                    <div class="scroll-track-v"></div>
+                    <div class="scroll-btn">▼</div>
+                </div>
+            </div>
+            <div class="scrollbar-horizontal-row">
+                <div class="scrollbar-horizontal">
+                    <div class="scroll-btn">◀</div>
+                    <div class="scroll-track-h"></div>
+                    <div class="scroll-btn">▶</div>
+                </div>
+                <div class="corner-square"></div>
+            </div>
+        </div>
+        
+        <!-- Texte en dessous -->
+        <div class="text-container">
+            <div class="message" id="messageDisplay"></div>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        const alertBox = document.getElementById('alert-box');
+        const mediaContainer = document.getElementById('mediaContainer');
+        const messageDisplay = document.getElementById('messageDisplay');
+
+        let alertQueue = [];
+        let isPlaying = false;
+
+        socket.on('trigger_alert', function(data) {
+            alertQueue.push(data);
+            processQueue();
+        });
+
+        function processQueue() {
+            if (isPlaying || alertQueue.length === 0) return;
+
+            isPlaying = true;
+            const currentAlert = alertQueue.shift();
+
+            messageDisplay.textContent = currentAlert.message || "";
+
+            if (currentAlert.type === 'video') {
+                const video = document.createElement('video');
+                video.src = currentAlert.url;
+                video.autoplay = true;
+                video.muted = false;
+                video.volume = 1.0;
+                video.playsInline = true;
+
+                video.onloadedmetadata = () => {
+                    mediaContainer.innerHTML = '';
+                    mediaContainer.appendChild(video);
+                    alertBox.classList.add('show');
+                    
+                    let vidTime = video.duration * 1000;
+                    let displayDuration = Math.min(Math.max(vidTime, 5000), 15000);
+                    hideAlertAfter(displayDuration);
+                };
+            } else {
+                const img = new Image();
+                img.src = currentAlert.url;
+                img.onload = () => {
+                    mediaContainer.innerHTML = '';
+                    mediaContainer.appendChild(img);
+                    alertBox.classList.add('show');
+                    
+                    hideAlertAfter(7000);
+                };
+            }
+        }
+
+        function hideAlertAfter(duration) {
+            setTimeout(() => {
+                alertBox.classList.remove('show');
+                setTimeout(() => {
+                    mediaContainer.innerHTML = '';
+                    messageDisplay.textContent = '';
+                    isPlaying = false;
+                    processQueue();
+                }, 400);
+            }, duration);
+        }
+    </script>
+
+</body>
+</html>
