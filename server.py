@@ -1,3 +1,6 @@
+import eventlet
+eventlet.monkey_patch()
+
 import os
 import requests
 import ssl
@@ -131,12 +134,9 @@ def twitch_callback():
 
 @app.route('/logout')
 def logout():
-    # 1. Vide la session
     session.clear()
-    
-    # 2. Crée une redirection et force le navigateur à supprimer le cookie de session
     response = redirect(url_for('index'))
-    response.delete_cookie('session') # Supprime le cookie de session Flask
+    response.delete_cookie('session')
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     return response
 
