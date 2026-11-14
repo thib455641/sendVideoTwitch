@@ -1,9 +1,12 @@
 import os
 import requests
+import ssl
 from flask import Flask, render_template, request, jsonify, url_for, session, redirect, make_response
 from flask_socketio import SocketIO, emit
 from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
+from requests.adapters import HTTPAdapter
+from urllib3.poolmanager import PoolManager
 
 # Charge les variables du fichier .env
 load_dotenv()
@@ -92,7 +95,20 @@ def twitch_callback():
         'redirect_uri': TWITCH_REDIRECT_URI
     }
     
-    token_res = requests.post(token_url, data=token_data)
+    class SSLAdapter(HTTPAdapter):
+        def init_poolmanager(self, connections, maxsize, block=False, **pool_kwargs):
+            context = ssl.create_default_context()
+            context.check_hostname = False
+            context.verify_mode = ssl.CERT_NONE
+            self.poolmanager = PoolManager(
+                num_pools=connections, maxsize=maxsize, block=block, ssl_context=context, **pool_kwargs
+            )
+
+    # Utilise cet adaptateur pour ton appel Twitch
+    http_session = requests.Session()
+    http_session.mount("https://", SSLAdapter())
+    token_res = http_session.post(token_url, data=token_data)
+    
     if token_res.status_code != 200:
         return "Échec de l'authentification auprès de Twitch", 500
     
@@ -102,7 +118,7 @@ def twitch_callback():
         'Client-ID': TWITCH_CLIENT_ID,
         'Authorization': f'Bearer {access_token}'
     }
-    user_res = requests.get('https://api.twitch.tv/helix/users', headers=user_headers)
+    user_res = http_session.get('https://api.twitch.tv/helix/users', headers=user_headers)
     
     if user_res.status_code != 200:
         return "Impossible de récupérer le profil Twitch", 500
