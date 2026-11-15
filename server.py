@@ -185,18 +185,21 @@ def get_queue():
 
 @socketio.on('moderate_action')
 def handle_moderation(data):
-    action = data.get('action')
-    item_id = data.get('id')
+    try:
+        action = data.get('action')
+        item_id = data.get('id')
 
-    global moderation_queue
-    target_item = next((item for item in moderation_queue if item['id'] == item_id), None)
+        global moderation_queue
+        target_item = next((item for item in moderation_queue if item['id'] == item_id), None)
 
-    if target_item:
-        moderation_queue = [item for item in moderation_queue if item['id'] != item_id]
-        socketio.emit('update_queue', moderation_queue)
+        if target_item:
+            moderation_queue = [item for item in moderation_queue if item['id'] != item_id]
+            socketio.emit('update_queue', moderation_queue)
 
-        if action == 'accept':
-            socketio.emit('trigger_alert', target_item)
+            if action == 'accept':
+                socketio.emit('trigger_alert', target_item)
+    except Exception as e:
+        print(f"Erreur modération socket: {e}")
 
 if __name__ == '__main__':
     socketio.run(app, debug=True, port=5000)
